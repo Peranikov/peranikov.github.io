@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv='Content-type' content='text/html; charset=utf-8'>
+    <title>Basic Example with JSX</title>
+  </head>
+  <body>
+    <div id="svgarea"></div>
+    <div id="buttonarea"></div>
+    <script src="./build/react.js"></script>
+    <script src="./build/JSXTransformer.js"></script>
+    <script type="text/jsx">
+      //Application State
+      var FILL = {
+          Red:   "#f00",
+          Green: "#0f0",
+          Blue:  "#00f"
+      }
+
+      //Payload
+      var Payload = (function() {
+        function Payload(invokedActionType) {
+          this.actionType = invokedActionType;
+        }
+        return Payload;
+      })();
+
+      //Action
+      var Action = {
+        switchFill: function(fill) {
+          Dispatcher.handleViewAction(new Payload(fill));
+        }
+      }
+
+      //Dispatcher
+      var Dispatcher = {
+        callbacks: [],
+        handleViewAction: function(payload){
+          this.dispatch(payload);
+        },
+        register: function(callback){
+          this.callbacks.push(callback);
+        },
+        dispatch: function(payload){
+          this.callbacks.forEach(function(cb){
+            cb(payload);
+          });
+        }
+      }
+
+      //Store
+      var FillStore = {
+        fill: FILL.Red,
+        listeners: [],
+        getFill: function(){
+          return this.fill;
+        },
+        setFill: function(fill){
+          if(this.fill != fill){
+            this.fill = fill;
+            //emit the change
+            this.listeners.forEach(function(cb){
+              cb();
+            });
+          }
+        },
+        receive: function(payload){
+          this.setFill(payload.actionType);
+        },
+        addListener: function(callback){
+          this.listeners.push(callback);
+        }
+      };
+
+      getContext = function(){
+        return {
+          fill: FillStore.getFill()
+        }
+      }
+
+      var SvgArea = React.createClass({
+        render: function() {
+          return (
+            <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+              <Circle fill={this.props.context.fill} />
+            </svg>
+          );
+        }
+      });
+
+      var ButtonArea = React.createClass({
+        handleClick: function() {
+          var selected = event.target.getAttribute("data-value");
+          Action.switchFill(selected);
+        },
+        render: function() {
+          var self = this;
+          var selected = this.props.context.fill;
+          var fills = Object.keys(FILL).map(function(f) {
+            return { name: f, value: FILL[f] }
+          });
+          var buttons = fills.map(function(f){
+            return <div key={f.name}><button data-value={f.value} onClick={self.handleClick}>{f.name}</button></div>
+          });
+          return (
+            <div>{buttons}</div>
+          );
+        }
+      });
+
+      var Circle = React.createClass({
+        render: function() {
+          return <circle cx="150" cy="150" r="100" fill={this.props.fill}></circle>
+        }
+      });
+
+      var initial = getContext();
+      var svgarea = React.render(<SvgArea context={initial} />, document.getElementById('svgarea'));
+      var buttonarea = React.render(<ButtonArea context={initial} />, document.getElementById('buttonarea'));
+
+      //Add Dispatcher callback
+      Dispatcher.register(function(payload){
+        FillStore.receive(payload);
+      });
+
+      //Add Store callback
+      FillStore.addListener(function(){
+        [svgarea, buttonarea].forEach(function(v){
+          v.setProps({context: getContext()});
+        })
+      })
+    </script>
+  </body>
+</html>
